@@ -15,7 +15,6 @@ library(fmsb)
 library(aricode)
 library(reticulate)
 library(tidyr)
-library(patchwork)
 library(ggridges)
 library(questionr)
 library(ggridges)
@@ -26,12 +25,16 @@ library(RPostgres)
 library(hubr)
 library(ConsensusClusterPlus)
 library(cowplot)
+library(Rbeast)
+library(changepoint)
+library(patchwork)
+
 
 # ============================================
 # Ajout et préparation des données
 # ============================================
 
-# Ajout de données RDS 
+# Ajout de données des change points RDS 
 add_data_normal_RDS <- function(){ 
   R1 <- readRDS("Data/normal/RDS/normale1_data.rds") # 100 ietration
   R2 <- readRDS("Data/normal/RDS/normale2_data.rds")
@@ -81,7 +84,7 @@ add_data_gamma_RDS <- function(){
 resultat_gamma <- add_data_gamma_RDS()
 
 
-# Ajout des séries 
+# Ajout des signaux brutes
 add_series_normal_RDS <- function(){
   S1 <- readRDS("Data/normal/RDS/normale1_serie.rds")
   S2 <- readRDS("Data/normal/RDS/normale2_serie.rds")
@@ -192,7 +195,7 @@ prep_data_normal <- function(){
   # Combine the data frames
   resultat_normal <- rbind(pelt, cpm, beast, CumSeg, BinSeg, SegNeigh, hubert)
   
-  # Ajouter le rand Index avec une fonction empirique 
+  # Ajouter le rand Index 
   rand_index_f <- function(bkps1, bkps2, N) { 
     bkps1 <- c(bkps1, N)
     bkps2 <- c(bkps2, N)
@@ -241,7 +244,7 @@ prep_data_normal <- function(){
   resultat_normal$rand <- mapply(rand_index_f, resultat_normal$cpt_loca,
                                  resultat_normal$k, resultat_normal$N)
   
-  # 5e version et bonne version de jaccard qui comprend la tolerance et les doublons (cpt proche dans la meme zone de tolérance pour norml distibution)
+  # Ajouter le Jaccard 
   calculate_metrics_with_similarity <- function(real_changes, detected_changes, tolerance) {
     # Initialisation des variables
     TP <- 0
@@ -286,7 +289,7 @@ prep_data_normal <- function(){
                                     tolerance = 10)
   
   
-  # changement en numerique des colonnes (au lieu de list)
+  # changement des données en numerique (au lieu de list)
   resultat_normal$nb_k <- unlist(resultat_normal$nb_k)
   resultat_normal$N <- unlist(resultat_normal$N)
   resultat_normal$Esigma_k <- unlist(resultat_normal$Esigma_k)
@@ -567,39 +570,53 @@ gamma_delta_002 <- resultat_gamma %>%
 # ============================================
 
 ##### Figure 1 #####
-# Sélectionner une série aléatoire normal
+### Sélectionner une série aléatoire normal 
+# Distribution Normale / r=0.5
 serie_normal_05 <- serie_normal[sample(which(serie_normal$ratio == 0.5 & serie_normal$K == 5
                                              & serie_normal$delta == 0.02 &
                                                serie_normal$segment_mean == 200), 1), ]
 
+# Distribution Normale / r=1
 serie_normal_1 <- serie_normal[sample(which(serie_normal$ratio == 1 & serie_normal$K == 5
                                             & serie_normal$delta == 0 &
                                               serie_normal$segment_mean == 200), 1), ]
 
+# Distribution Normale / r=2
 serie_normal_2 <- serie_normal[sample(which(serie_normal$ratio == 2 & serie_normal$K == 5
                                             & serie_normal$delta == 0 &
                                               serie_normal$segment_mean == 200), 1), ]
 
+# Distribution Gamma / r=0.5
 serie_gamma_05 <- serie_gamma[sample(which(serie_gamma$ratio == 0.5 & serie_gamma$K == 5
                                            & serie_gamma$delta == 0.02 
                                            & serie_gamma$log == 0 
                                            & serie_gamma$segment_mean == 200), 1), ]
 
+# Distribution Gamma / r=1
 serie_gamma_1 <- serie_gamma[sample(which(serie_gamma$ratio == 1 & serie_gamma$K == 5
                                           & serie_gamma$delta == 0 
                                           & serie_gamma$log == 0 
                                           & serie_gamma$segment_mean == 200), 1), ]
 
+# Distribution Gamma / r=2
 serie_gamma_2 <- serie_gamma[sample(which(serie_gamma$ratio == 2 & serie_gamma$K == 5
                                           & serie_gamma$delta == 0  
                                           & serie_gamma$log == 0 
                                           &  serie_gamma$segment_mean == 200), 1), ]
 
-# creation data frame avec les signaux + template
+# Compilation des données dans un seul DF
 signal <- as.data.frame(serie_normal_05$series)
 colnames(signal)[1] <- "Signal"
 signal <- cbind(signal,as.data.frame(serie_normal_05$template))
 colnames(signal)[2] <- "Template"
+info <- resultat_normal[resultat_normal$id %in% serie_normal_05$id, ]
+signal$mu_0 <- info$mu_0[1]
+signal <- signal %>%
+  group_by(Template) %>%
+  mutate(
+    q2.5 = ifelse(all(is.na(Template)), NA, quantile(Signal, probs = 0.025, na.rm = TRUE)),   # Quantile 2.5%
+    q97.5 = ifelse(all(is.na(Template)), NA, quantile(Signal, probs = 0.975, na.rm = TRUE))  # Quantile 97.5%
+  )
 signal$ID <- "r = 0.5*"
 signal$index <- 1:nrow(signal)
 signal_normal <- signal
@@ -608,6 +625,14 @@ signal <- as.data.frame(serie_normal_1$series)
 colnames(signal)[1] <- "Signal"
 signal <- cbind(signal,as.data.frame(serie_normal_1$template))
 colnames(signal)[2] <- "Template"
+info <- resultat_normal[resultat_normal$id %in% serie_normal_1$id, ]
+signal$mu_0 <- info$mu_0[1]
+signal <- signal %>%
+  group_by(Template) %>%
+  mutate(
+    q2.5 = ifelse(all(is.na(Template)), NA, quantile(Signal, probs = 0.025, na.rm = TRUE)),   # Quantile 2.5%
+    q97.5 = ifelse(all(is.na(Template)), NA, quantile(Signal, probs = 0.975, na.rm = TRUE))  # Quantile 97.5%
+  )
 signal$ID <- "r = 1"
 signal$index <- 1:nrow(signal)
 signal_normal <- rbind(signal_normal, signal)
@@ -616,6 +641,14 @@ signal <- as.data.frame(serie_normal_2$series)
 colnames(signal)[1] <- "Signal"
 signal <- cbind(signal,as.data.frame(serie_normal_2$template))
 colnames(signal)[2] <- "Template"
+info <- resultat_normal[resultat_normal$id %in% serie_normal_2$id, ]
+signal$mu_0 <- info$mu_0[1]
+signal <- signal %>%
+  group_by(Template) %>%
+  mutate(
+    q2.5 = ifelse(all(is.na(Template)), NA, quantile(Signal, probs = 0.025, na.rm = TRUE)),   # Quantile 2.5%
+    q97.5 = ifelse(all(is.na(Template)), NA, quantile(Signal, probs = 0.975, na.rm = TRUE))  # Quantile 97.5%
+  )
 signal$ID <- "r = 2"
 signal$index <- 1:nrow(signal)
 signal_normal <- rbind(signal_normal, signal)
@@ -624,7 +657,15 @@ signal <- as.data.frame(serie_gamma_05$series)
 colnames(signal)[1] <- "Signal"
 signal <- cbind(signal,as.data.frame(serie_gamma_05$template))
 colnames(signal)[2] <- "Template"
-signal$ID <- "0.5 + gradual"
+info <- resultat_gamma[resultat_gamma$id %in% serie_gamma_05$id, ]
+signal$mu_0 <- info$mu_0[1]
+signal <- signal %>%
+  group_by(Template) %>%
+  mutate(
+    q2.5 = ifelse(all(is.na(Template)), NA, quantile(Signal, probs = 0.025, na.rm = TRUE)),   # Quantile 2.5%
+    q97.5 = ifelse(all(is.na(Template)), NA, quantile(Signal, probs = 0.975, na.rm = TRUE))  # Quantile 97.5%
+  )
+signal$ID <- "r = 0.5*"
 signal$index <- 1:nrow(signal)
 signal_gamma <- signal
 
@@ -632,7 +673,15 @@ signal <- as.data.frame(serie_gamma_1$series)
 colnames(signal)[1] <- "Signal"
 signal <- cbind(signal,as.data.frame(serie_gamma_1$template))
 colnames(signal)[2] <- "Template"
-signal$ID <- "1"
+info <- resultat_gamma[resultat_gamma$id %in% serie_gamma_1$id, ]
+signal$mu_0 <- info$mu_0[1]
+signal <- signal %>%
+  group_by(Template) %>%
+  mutate(
+    q2.5 = ifelse(all(is.na(Template)), NA, quantile(Signal, probs = 0.025, na.rm = TRUE)),   # Quantile 2.5%
+    q97.5 = ifelse(all(is.na(Template)), NA, quantile(Signal, probs = 0.975, na.rm = TRUE))  # Quantile 97.5%
+  )
+signal$ID <- "r = 1"
 signal$index <- 1:nrow(signal)
 signal_gamma <- rbind(signal_gamma, signal)
 
@@ -640,18 +689,25 @@ signal <- as.data.frame(serie_gamma_2$series)
 colnames(signal)[1] <- "Signal"
 signal <- cbind(signal,as.data.frame(serie_gamma_2$template))
 colnames(signal)[2] <- "Template"
-signal$ID <- "2"
+info <- resultat_gamma[resultat_gamma$id %in% serie_gamma_2$id, ]
+signal$mu_0 <- info$mu_0[1]
+signal <- signal %>%
+  group_by(Template) %>%
+  mutate(
+    q2.5 = ifelse(all(is.na(Template)), NA, quantile(Signal, probs = 0.025, na.rm = TRUE)),   # Quantile 2.5%
+    q97.5 = ifelse(all(is.na(Template)), NA, quantile(Signal, probs = 0.975, na.rm = TRUE))  # Quantile 97.5%
+  )
+signal$ID <- "r = 2"
 signal$index <- 1:nrow(signal)
 signal_gamma <- rbind(signal_gamma, signal)
 
-# signals$ID <- factor(signals$ID, levels = c("Distribution normale : r = 0.5 / δ = smooth", "Distribution gamma : r = 0.5 / δ = smooth",
-#                                             "Distribution normale : r = 1","Distribution gamma : r = 1",
-#                                             "Distribution normale : r = 2", "Distribution gamma : r = 2"))
-# 
-
+# Création du graphique combiné 
 h1 <- ggplot() +
   geom_line(data = signal_normal, aes(x = index, y = Signal), color = "black", size = 0.7) +  # Ligne pour Signal
-  geom_line(data = signal_normal, aes(x = index, y = Template), color = "red", size = 1.2) + # Ligne pour Template
+  geom_line(data = signal_normal, aes(x = index, y = mu_0), color = "#0C3C78", size = 1) + # Ligne pour Template
+  geom_line(data = signal_normal, aes(x = index, y = Template), color = "#E42F45", size = 1) + # Ligne pour Template
+  geom_line(data = signal_normal, aes(x = index, y = q2.5), color = "#0C3C78", size = 1,linetype = "dashed") + # Ligne pour Template
+  geom_line(data = signal_normal, aes(x = index, y = q97.5), color = "#0C3C78", size = 1,linetype = "dashed") + # Ligne pour Template
   facet_grid(ID ~ ., scales = "free_y") +  # Facettes avec titres à gauche
   theme_minimal() +
   labs(title = "a", x = NULL, y = NULL) +  # Étiquette personnalisée
@@ -668,7 +724,10 @@ h1 <- ggplot() +
 
 h2 <- ggplot() +
   geom_line(data = signal_gamma, aes(x = index, y = Signal), color = "black", size = 0.7) +  # Ligne pour Signal
-  geom_line(data = signal_gamma, aes(x = index, y = Template), color = "red", size = 1.2) + # Ligne pour template
+  geom_line(data = signal_gamma, aes(x = index, y = mu_0), color = "#0C3C78", size = 1) + # Ligne pour Template
+  geom_line(data = signal_gamma, aes(x = index, y = Template), color = "#E42F45", size = 1) + # Ligne pour Template
+  geom_line(data = signal_gamma, aes(x = index, y = q2.5), color = "#0C3C78", size = 1,linetype = "dashed") + # Ligne pour Template
+  geom_line(data = signal_gamma, aes(x = index, y = q97.5), color = "#0C3C78", size = 1,linetype = "dashed") + # Ligne pour Template
   facet_wrap(~ ID, ncol = 1, scales = "free_y") +  # Facettes pour chaque méthode
   theme_minimal() +
   labs(title = "b", x = NULL, y = NULL) +  # Étiquette personnalisée  
@@ -686,23 +745,11 @@ h2 <- ggplot() +
 
 h1 +h2
 
-
 ##### Figure 2 #####
 time <- resultat_normal %>%
   dplyr::select(time,algo,N)
 time <- rbind(time, resultat_gamma %>%
                 dplyr::select(time,algo,N))
-# time <- na.omit(time)
-
-data_mean <- time %>%
-  group_by(algo, N) %>%
-  summarise(mean_value = mean(time), .groups = "drop")
-mean_250 <- data_mean$mean_value[data_mean$N == 250]
-mean_3000 <- data_mean$mean_value[data_mean$N == 3000]
-diff_percentage <- ((mean_3000 - mean_250) / mean_250) * 100
-print(diff_percentage)
-print(unique(data_mean$algo))
-
 
 ggplot(time, aes(x = as.factor(N), y = time, fill = algo, colour = algo)) + 
   geom_boxplot(outlier.shape = NA, show.legend = TRUE, width = 0.5) +  # Augmenter la largeur
@@ -731,8 +778,8 @@ ggplot(time, aes(x = as.factor(N), y = time, fill = algo, colour = algo)) +
   scale_fill_brewer(n="Algorithms",palette = "Dark2")
 
 
-
-##### Figure 3 - 4 #####
+##### Figure 3 #####
+# Mise en forme des données : Sélection des données
 combined <- resultat_normal %>%
   dplyr::select(segment_mean,name_segment,segment_mean_algo,algo,
                 name_ratio,ratio,delta,K,cpt,rand,jaccard)
@@ -746,18 +793,8 @@ combined$ID <- factor(combined$ID,levels = c("Normal","Gamma"))
 
 combined_delta_0 <- combined %>%
   dplyr::filter(delta == 0)
-combined_delta_002 <- combined %>%
-  dplyr::filter(delta == 0.02)
 
-data_mean <- combined_delta_0 %>%
-  group_by(algo, segment_mean,name_ratio) %>%
-  summarise(mean_value = mean(segment_mean_algo), .groups = "drop")
-mean_250 <- data_mean$mean_value[data_mean$name_ratio == "r = 0.5"]
-mean_3000 <- data_mean$mean_value[data_mean$name_ratio == "r = 2"]
-diff_percentage <- ((mean_3000 - mean_250) / mean_250) * 100
-print(diff_percentage)
-print(unique(data_mean$algo))
-# pour shift change
+# Création du graphique
 ggplot(combined_delta_0, aes(x = factor(ratio), y = segment_mean_algo ,fill = factor(algo))) +
   geom_boxplot(color = "black", outliers = FALSE,show.legend = TRUE) +
   geom_hline(aes(yintercept = segment_mean),linetype = "dashed",show.legend = FALSE)+
@@ -807,11 +844,51 @@ ggplot(combined_delta_002, aes(x = factor(ratio), y = segment_mean_algo ,fill = 
   scale_fill_brewer(n="Algorithms",palette = "Dark2")
 
 
+##### Figure 4 #####
+# Mise en forme des données : Sélection des données
+combined <- resultat_normal %>%
+  dplyr::select(segment_mean,name_segment,segment_mean_algo,algo,
+                name_ratio,ratio,delta,K,cpt,rand,jaccard)
+combined$ID <- "Normal"
+combined2 <-  resultat_gamma %>%
+  dplyr::select(segment_mean,name_segment,segment_mean_algo,algo,
+                name_ratio,ratio,delta,K,cpt,rand,jaccard)
+combined2$ID <- "Gamma"
+combined <- rbind(combined,combined2)
+combined$ID <- factor(combined$ID,levels = c("Normal","Gamma"))
+
+# Sélection uniquement des données avec Delta 0.02
+combined_delta_002 <- combined %>%
+  dplyr::filter(delta == 0.02)
+
+# Création du graphique
+ggplot(combined_delta_002, aes(x = factor(ratio), y = segment_mean_algo ,fill = factor(algo))) +
+  geom_boxplot(color = "black", outliers = FALSE,show.legend = TRUE) +
+  geom_hline(aes(yintercept = segment_mean),linetype = "dashed",show.legend = FALSE)+
+  facet_grid(name_segment~ID) +
+  theme_bw() +
+  scale_y_log10(
+    breaks = c(10,50, 100,200, 1000),            # Ticks majeurs aux valeurs spécifiées
+    minor_breaks = c(seq(0, 100, by = 10), seq(100, 1000, by = 100)) # Ticks mineurs
+  ) +
+  theme(
+    # axis.ticks.x = element_blank(),
+    axis.title.y = element_text(size = 24, margin = margin(r = 10)),  
+    axis.title.x = element_text(size = 24, margin = margin(t = 10)),
+    axis.text.y = element_text(size = 16),
+    axis.text.x = element_text(size = 16),
+    legend.text = element_text(size = 18),  
+    legend.title = element_text(size = 20),
+    strip.text = element_text(size = 16)
+  )+ 
+  annotation_logticks(sides = "l",size = 0.25 ) + 
+  labs(y = "Mean segment length", x = expression(italic(r)~ "ratio"), title = NULL) +
+  scale_fill_brewer(n="Algorithms",palette = "Dark2")
 
 
 
-
-##### Figure 5 - 6 #####
+##### Figure 5 #####
+# Mise en forme des données : Sélection des données
 combined <- resultat_normal %>%
   dplyr::select(segment_mean,name_segment,segment_mean_algo,algo,
                 name_ratio,ratio,delta,K,cpt,rand,jaccard)
@@ -825,9 +902,8 @@ combined$ID <- factor(combined$ID,levels = c("Normal","Gamma"))
 
 combined_delta_0 <- combined %>%
   dplyr::filter(delta == 0)
-combined_delta_002 <- combined %>%
-  dplyr::filter(delta == 0.02)
 
+# Création du graphique
 ggplot(combined_delta_0, aes(x = factor(ratio), y = rand ,fill = factor(algo))) +
   geom_boxplot(color = "black", outliers = FALSE,show.legend = TRUE) +
   facet_grid(name_segment~ID) +
@@ -846,6 +922,23 @@ ggplot(combined_delta_0, aes(x = factor(ratio), y = rand ,fill = factor(algo))) 
   scale_fill_brewer(n="Algorithms",palette = "Dark2")
 
 
+##### Figure 6 #####
+# Mise en forme des données : Sélection des données
+combined <- resultat_normal %>%
+  dplyr::select(segment_mean,name_segment,segment_mean_algo,algo,
+                name_ratio,ratio,delta,K,cpt,rand,jaccard)
+combined$ID <- "Normal"
+combined2 <-  resultat_gamma %>%
+  dplyr::select(segment_mean,name_segment,segment_mean_algo,algo,
+                name_ratio,ratio,delta,K,cpt,rand,jaccard)
+combined2$ID <- "Gamma"
+combined <- rbind(combined,combined2)
+combined$ID <- factor(combined$ID,levels = c("Normal","Gamma"))
+
+combined_delta_0 <- combined %>%
+  dplyr::filter(delta == 0)
+
+# Création du graphique
 ggplot(combined_delta_0, aes(x = factor(ratio), y = jaccard ,fill = factor(algo))) +
   geom_boxplot(color = "black", outliers = FALSE,show.legend = TRUE) +
   facet_grid(name_segment~ID) +
@@ -864,8 +957,7 @@ ggplot(combined_delta_0, aes(x = factor(ratio), y = jaccard ,fill = factor(algo)
   scale_fill_brewer(n="Algorithms",palette = "Dark2")
 
 
-
-##### ensambling real data #####
+##### Ensambling (pour Figure 7) #####
 # ensambling pour AC
 extract_cp_matrix <- function(resultats_reel_AC) {
   cp_columns <- resultats_reel_AC %>%
@@ -1424,4 +1516,126 @@ plot_grid(v1, v2, ncol = 1, labels = c("a", "b"), label_size = 25)
 
 
 
+
+##### Figure 9 #####
+# Génération des data
+generate_segmented_series <- function(mean_central, variance, segment_length = 100, transition_length) {
+  set.seed(123)  # Pour la reproductibilité
+  
+  # Générer 4 moyennes différentes autour de la moyenne centrale
+  segment_means <- mean_central + runif(4, -1, 1)
+  
+  # Générer les 4 segments avec rnorm
+  segment1 <- rnorm(segment_length, mean = segment_means[1], sd = sqrt(variance))
+  segment2 <- rnorm(segment_length, mean = segment_means[2], sd = sqrt(variance))
+  segment3 <- rnorm(segment_length, mean = segment_means[3], sd = sqrt(variance))
+  segment4 <- rnorm(segment_length, mean = segment_means[4], sd = sqrt(variance))
+  
+  # Fonction pour créer une transition linéaire entre deux segments
+  create_transition <- function(start, end, length) {
+    seq(start, end, length.out = length) + rnorm(length, mean = 0, sd = sqrt(variance) / 2)
+  }
+  
+  # Ajouter des transitions douces entre les segments
+  transition1 <- create_transition(tail(segment1, 1), head(segment2, 1), transition_length)
+  transition2 <- create_transition(tail(segment2, 1), head(segment3, 1), transition_length)
+  transition3 <- create_transition(tail(segment3, 1), head(segment4, 1), transition_length)
+  
+  # Concaténer les segments et les transitions
+  series <- c(segment1, transition1, segment2, transition2, segment3, transition3, segment4)
+  
+  return(series)
+}
+
+# Exemple d'utilisation
+serie_0 <- generate_segmented_series(mean_central = 0, variance = 0, transition_length = 20)
+serie_05 <- generate_segmented_series(mean_central = 0, variance = 0.05, transition_length = 20)
+
+# Calcul des points de changement par chaque algorithme
+#BEAST
+cpt_result <- beast(serie_0, season = "none", tcp.minmax = c(0, 150), quiet = 1)
+ncp_mode_beast <- cpt_result$trend$ncp_mode
+cp_beast <- cpt_result$trend$cp
+cpt_beast <- cp_beast[1:ncp_mode_beast]
+cpt_beast <- sort(cpt_beast)
+
+#pelt
+cpt_result <- cpt.mean(serie_0, method = "PELT", penalty = "Manual",
+                       pen.value = var(serie_0) * log(length(serie_0)))
+cpt_pelt <- cpt_result@cpts
+cpt_pelt <- cpt_pelt[-length(cpt_pelt)]
+
+
+df_0 <- data.frame(
+  Time = 1:length(serie_0),
+  Value = serie_0
+)
+
+# Points de rupture sous forme de dataframe
+breakpoints_0 <- bind_rows(
+  data.frame(Time = cpt_beast, method = "BEAST"),
+  data.frame(Time = cpt_pelt, method = "PELT"),
+)
+
+
+#BEAST
+cpt_result <- beast(serie_05, season = "none", tcp.minmax = c(0, 150), quiet = 1)
+ncp_mode_beast <- cpt_result$trend$ncp_mode
+cp_beast <- cpt_result$trend$cp
+cpt_beast <- cp_beast[1:ncp_mode_beast]
+cpt_beast <- sort(cpt_beast)
+
+#pelt
+#pelt
+cpt_result <- cpt.mean(serie_05, method = "PELT", penalty = "Manual",
+                       pen.value = var(serie_05) * log(length(serie_05)))
+cpt_pelt <- cpt_result@cpts
+cpt_pelt <- cpt_pelt[-length(cpt_pelt)]
+
+df_05 <- data.frame(
+  Time = 1:length(serie_05),
+  Value = serie_05
+)
+
+# Points de rupture sous forme de dataframe
+breakpoints_05 <- bind_rows(
+  data.frame(Time = cpt_beast, method = "BEAST"),
+  data.frame(Time = cpt_pelt, method = "PELT"),
+)
+
+
+# Déterminer les bornes de l'axe Y (les mêmes pour les deux graphes)
+min_y <- min(df_0$Value, df_05$Value)
+max_y <- max(df_0$Value, df_05$Value)
+
+# Graphique 1
+a <- ggplot(df_0, aes(x = Time, y = Value)) +
+  geom_line(color = "black") +
+  geom_vline(data = breakpoints_0, aes(xintercept = Time), color = "red", 
+             linetype = "dashed", size = 1.2) +  
+  facet_wrap(~method, scales = "free_x", strip.position = "left", ncol = 1) +  
+  labs(x = NULL, y = NULL) +  # Supprime les labels des axes
+  ylim(min_y, max_y) +  # Fixe les bornes de Y
+  theme_void() +  # Supprime tous les éléments du thème
+  theme(
+    strip.text = element_text(size = 14, face = "bold", margin = margin(r = 10)),  # Décale vers la gauche
+    panel.border = element_rect(color = "black", fill = NA, linewidth = 1)  # Ajoute un cadre autour de chaque facette
+  )
+
+# Graphique 2
+b <- ggplot(df_05, aes(x = Time, y = Value)) +
+  geom_line(color = "black") +
+  geom_vline(data = breakpoints_05, aes(xintercept = Time), color = "red", 
+             linetype = "dashed", size = 1.2) +  
+  facet_wrap(~method, scales = "free_x", strip.position = "left", ncol = 1) +  
+  labs(x = NULL, y = NULL) +  # Supprime les labels des axes
+  ylim(min_y, max_y) +  # Fixe les bornes de Y
+  theme_void() +  # Supprime tous les éléments du thème
+  theme(
+    strip.text = element_blank(),  # Décale vers la gauche
+    panel.border = element_rect(color = "black", fill = NA, linewidth = 1)  # Ajoute un cadre autour de chaque facette
+  )
+
+# Combinaison des graphiques avec même hauteur et axe aligné
+a + b + plot_annotation(tag_levels = 'A')
 

@@ -393,7 +393,7 @@ K <- c(5, 10, 15)
 ratio <- c(0.5, 1, 2)
 delta <- c(0, 0.02)
 heterosced <- c(0)
-replicate <- 1
+replicate <- 1000
 
 # Combinaison des paramètres pour les simulations
 resultats <- crossing(segment_mean, K, ratio, delta, heterosced)

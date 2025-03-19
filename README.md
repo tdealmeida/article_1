@@ -1,5 +1,9 @@
-# article_1
+You will find all the R utulised scripts used to produce the analyses and figures in the article : Performance and Geovisualization of Segmentation Methods Applied to River continuums at Network scale.
 
-Veuillez retrouver dans les scripts normal_simulation et gamma_simulation, les codes utilisés pour générer les signaux et les itérer 1000 fois.
+Graphics : Formatting data and creating figures
 
-Graphics comprend le code afin de générer les figures de l'article hormis les captures d'écran / schéma.
+real_data : Importing and formatting real data, then segmenting the data for all segmentation methods
+
+gamma_simulation : Generation of a Gamma distribution signal with the segmentation results for each segmentation method. Iteration 1000
+
+normal_simulation : Generation of a Normal distribution signal with the segmentation results for each segmentation method. Iteration 1000

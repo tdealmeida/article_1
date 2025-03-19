@@ -412,7 +412,7 @@ delta <- c(0, 0.02)
 k1 <- c(4)
 theta1 <- c(5)
 log <- c(0)
-replicate <- 1
+replicate <- 1000
 
 # Combinaison des paramètres pour les simulations
 # resultats <- crossing(segment_mean, K, ratio, k1, theta1, delta, log) # Non utilisé directement
