@@ -745,7 +745,7 @@ h2 <- ggplot() +
 
 h1 +h2
 
-##### Figure 2 #####
+##### Figure A2 #####
 time <- resultat_normal %>%
   dplyr::select(time,algo,N)
 time <- rbind(time, resultat_gamma %>%
@@ -781,42 +781,61 @@ ggplot(time, aes(x = as.factor(N), y = time, fill = algo, colour = algo)) +
 ##### Figure 3 #####
 # Mise en forme des données : Sélection des données
 combined <- resultat_normal %>%
-  dplyr::select(segment_mean,name_segment,segment_mean_algo,algo,
-                name_ratio,ratio,delta,K,cpt,rand,jaccard)
+  dplyr::select(segment_mean, name_segment, segment_mean_algo, algo,
+                name_ratio, ratio, delta, K, N, nb_k, cpt, rand, jaccard)
 combined$ID <- "Normal"
-combined2 <-  resultat_gamma %>%
-  dplyr::select(segment_mean,name_segment,segment_mean_algo,algo,
-                name_ratio,ratio,delta,K,cpt,rand,jaccard)
-combined2$ID <- "Gamma"
-combined <- rbind(combined,combined2)
-combined$ID <- factor(combined$ID,levels = c("Normal","Gamma"))
 
+combined2 <- resultat_gamma %>%
+  dplyr::select(segment_mean, name_segment, segment_mean_algo, algo,
+                name_ratio, ratio, delta, K, N, nb_k, cpt, rand, jaccard)
+combined2$ID <- "Gamma"
+
+combined <- rbind(combined, combined2)
+combined$ID <- factor(combined$ID, levels = c("Normal", "Gamma"))
+
+# Filtrer delta == 0
 combined_delta_0 <- combined %>%
   dplyr::filter(delta == 0)
 
+# Calculer la moyenne de cpt par groupe
+df_mean <- combined_delta_0 %>%
+  group_by(algo, ID, ratio, segment_mean, K) %>%
+  summarise(mean_cpt = mean(cpt+1, na.rm = TRUE),
+            .groups = "drop") %>%
+  mutate(dif = mean_cpt - K) %>%  
+  rename(r = ratio)
+
 # Création du graphique
-ggplot(combined_delta_0, aes(x = factor(ratio), y = segment_mean_algo ,fill = factor(algo))) +
-  geom_boxplot(color = "black", outliers = FALSE,show.legend = TRUE) +
-  geom_hline(aes(yintercept = segment_mean),linetype = "dashed",show.legend = FALSE)+
-  facet_grid(name_segment~ID) +
+ggplot(df_mean, aes(
+  x = factor(segment_mean),
+  y = dif,
+  color = factor(algo),  # couleur par algo
+  linetype = ID, # style de ligne par ID (Normal/Gamma)
+  group = interaction(algo, ID) # connecter points par algo et ID
+  
+)) +
+  geom_line(size = 0.8) +
+  geom_point(size = 2) + 
+  facet_grid(K ~ r, labeller = label_both) +
+  facet_grid(K ~ r, scales = "free_y", labeller = label_both) +
+  geom_hline(aes(yintercept = 0), linetype = "dashed", color = "black", linewidth = 0.8) +
   theme_bw() +
-  scale_y_log10(
-    breaks = c(10,50, 100,200, 1000),            # Ticks majeurs aux valeurs spécifiées
-    minor_breaks = c(seq(0, 100, by = 10), seq(100, 1000, by = 100)) # Ticks mineurs
+  labs(
+    x = "Mean segment length (S)",
+    y = expression(Delta*"Segments (Estimated - Reference)"),
+    color = "Method",
+    linetype = "Distribution"
   ) +
+  scale_color_brewer(palette = "Dark2") +
+  # scale_y_continuous(trans = "log10", breaks = c(2,5,10,15,30))+
+  # scale_y_log10() +
   theme(
-    # axis.ticks.x = element_blank(),
-    axis.title.y = element_text(size = 24, margin = margin(r = 10)),  
-    axis.title.x = element_text(size = 24, margin = margin(t = 10)),
-    axis.text.y = element_text(size = 16),
-    axis.text.x = element_text(size = 16),
-    legend.text = element_text(size = 18),  
-    legend.title = element_text(size = 20),
-    strip.text = element_text(size = 16)
-  )+ 
-  annotation_logticks(sides = "l",size = 0.25 ) + 
-  labs(y = "Mean segment length", x = expression(italic(r)~ "ratio"), title = NULL) +
-  scale_fill_brewer(n="Algorithms",palette = "Dark2")
+    legend.position = "bottom",
+    panel.grid.minor = element_blank(),
+    axis.title = element_text(size = 16),
+    axis.text = element_text(size = 14),
+    strip.text = element_text(size = 14)
+  ) 
 
 
 # smooth change 
@@ -847,43 +866,61 @@ ggplot(combined_delta_002, aes(x = factor(ratio), y = segment_mean_algo ,fill = 
 ##### Figure 4 #####
 # Mise en forme des données : Sélection des données
 combined <- resultat_normal %>%
-  dplyr::select(segment_mean,name_segment,segment_mean_algo,algo,
-                name_ratio,ratio,delta,K,cpt,rand,jaccard)
+  dplyr::select(segment_mean, name_segment, segment_mean_algo, algo,
+                name_ratio, ratio, delta, K, N, nb_k, cpt, rand, jaccard)
 combined$ID <- "Normal"
-combined2 <-  resultat_gamma %>%
-  dplyr::select(segment_mean,name_segment,segment_mean_algo,algo,
-                name_ratio,ratio,delta,K,cpt,rand,jaccard)
+
+combined2 <- resultat_gamma %>%
+  dplyr::select(segment_mean, name_segment, segment_mean_algo, algo,
+                name_ratio, ratio, delta, K, N, nb_k, cpt, rand, jaccard)
 combined2$ID <- "Gamma"
-combined <- rbind(combined,combined2)
-combined$ID <- factor(combined$ID,levels = c("Normal","Gamma"))
+
+combined <- rbind(combined, combined2)
+combined$ID <- factor(combined$ID, levels = c("Normal", "Gamma"))
 
 # Sélection uniquement des données avec Delta 0.02
 combined_delta_002 <- combined %>%
   dplyr::filter(delta == 0.02)
 
+# Calculer la moyenne de cpt par groupe
+df_mean <- combined_delta_0 %>%
+  group_by(algo, ID, ratio, segment_mean, K) %>%
+  summarise(mean_cpt = mean(cpt+1, na.rm = TRUE),
+            .groups = "drop") %>%
+  mutate(dif = mean_cpt - K) %>%  # éviter les valeurs < 1 pour log scale
+  rename(r = ratio)
+
 # Création du graphique
-ggplot(combined_delta_002, aes(x = factor(ratio), y = segment_mean_algo ,fill = factor(algo))) +
-  geom_boxplot(color = "black", outliers = FALSE,show.legend = TRUE) +
-  geom_hline(aes(yintercept = segment_mean),linetype = "dashed",show.legend = FALSE)+
-  facet_grid(name_segment~ID) +
+ggplot(df_mean, aes(
+  x = factor(segment_mean),
+  y = dif,
+  color = factor(algo),  # couleur par algo
+  linetype = ID, # style de ligne par ID (Normal/Gamma)
+  group = interaction(algo, ID) # connecter points par algo et ID
+  
+)) +
+  geom_line(size = 0.8) +
+  geom_point(size = 2) + 
+  # facet_grid(K ~ r, labeller = label_both) +
+  facet_grid(K ~ r, scales = "free", labeller = label_both) +
+  geom_hline(aes(yintercept = 0), linetype = "dashed", color = "black", linewidth = 0.8) +
   theme_bw() +
-  scale_y_log10(
-    breaks = c(10,50, 100,200, 1000),            # Ticks majeurs aux valeurs spécifiées
-    minor_breaks = c(seq(0, 100, by = 10), seq(100, 1000, by = 100)) # Ticks mineurs
+  labs(
+    x = "Mean segment length (S)",
+    y = expression(Delta*"Segments (Estimated - Reference)"),
+    color = "Method",
+    linetype = "Distribution"
   ) +
+  scale_color_brewer(palette = "Dark2") +
+  # scale_y_continuous(trans = "log10", breaks = c(2,5,10,15,30))+
+  # scale_y_log10() +
   theme(
-    # axis.ticks.x = element_blank(),
-    axis.title.y = element_text(size = 24, margin = margin(r = 10)),  
-    axis.title.x = element_text(size = 24, margin = margin(t = 10)),
-    axis.text.y = element_text(size = 16),
-    axis.text.x = element_text(size = 16),
-    legend.text = element_text(size = 18),  
-    legend.title = element_text(size = 20),
-    strip.text = element_text(size = 16)
-  )+ 
-  annotation_logticks(sides = "l",size = 0.25 ) + 
-  labs(y = "Mean segment length", x = expression(italic(r)~ "ratio"), title = NULL) +
-  scale_fill_brewer(n="Algorithms",palette = "Dark2")
+    legend.position = "bottom",
+    panel.grid.minor = element_blank(),
+    axis.title = element_text(size = 16),
+    axis.text = element_text(size = 14),
+    strip.text = element_text(size = 14)
+  ) 
 
 
 
@@ -903,23 +940,44 @@ combined$ID <- factor(combined$ID,levels = c("Normal","Gamma"))
 combined_delta_0 <- combined %>%
   dplyr::filter(delta == 0)
 
+# Calculer la moyenne de rand par groupe
+df_mean <- combined_delta_0 %>%
+  group_by(algo, ID, ratio, segment_mean, K) %>%
+  summarise(mean_rand = mean(rand, na.rm = TRUE),
+            .groups = "drop") %>%
+  rename(r = ratio)
+
 # Création du graphique
-ggplot(combined_delta_0, aes(x = factor(ratio), y = rand ,fill = factor(algo))) +
-  geom_boxplot(color = "black", outliers = FALSE,show.legend = TRUE) +
-  facet_grid(name_segment~ID) +
+ggplot(df_mean, aes(
+  x = factor(segment_mean),
+  y = mean_rand,
+  color = factor(algo),  # couleur par algo
+  linetype = ID, # style de ligne par ID (Normal/Gamma)
+  group = interaction(algo, ID) # connecter points par algo et ID
+  
+)) +
+  geom_line(size = 0.8) +
+  geom_point(size = 2) + 
+  facet_grid(K ~ r, labeller = label_both) +
+  # facet_grid(K ~ r, scales = "free", labeller = label_both) +
+  # geom_hline(aes(yintercept = 0), linetype = "dashed", color = "black", linewidth = 0.8) +
   theme_bw() +
-  labs(y = "Rand Index", x = expression(italic(r)~ "ratio"), title = NULL) +
+  labs(
+    x = "Mean segment length (S)",
+    y = "Rand Index",
+    color = "Method",
+    linetype = "Distribution"
+  ) +
+  scale_color_brewer(palette = "Dark2") +
+  # scale_y_continuous(trans = "log10", breaks = c(2,5,10,15,30))+
+  # scale_y_log10() +
   theme(
-    # axis.ticks.x = element_blank(),
-    axis.title.y = element_text(size = 24, margin = margin(r = 10)),  
-    axis.title.x = element_text(size = 24, margin = margin(t = 10)),
-    axis.text.y = element_text(size = 16),
-    axis.text.x = element_text(size = 16),
-    legend.text = element_text(size = 18),  
-    legend.title = element_text(size = 20),
-    strip.text = element_text(size = 16)
-  )+ 
-  scale_fill_brewer(n="Algorithms",palette = "Dark2")
+    legend.position = "bottom",
+    panel.grid.minor = element_blank(),
+    axis.title = element_text(size = 16),
+    axis.text = element_text(size = 14),
+    strip.text = element_text(size = 14)
+  ) 
 
 
 ##### Figure 6 #####
@@ -938,23 +996,44 @@ combined$ID <- factor(combined$ID,levels = c("Normal","Gamma"))
 combined_delta_0 <- combined %>%
   dplyr::filter(delta == 0)
 
+# Calculer la moyenne de jaccard par groupe
+df_mean <- combined_delta_0 %>%
+  group_by(algo, ID, ratio, segment_mean, K) %>%
+  summarise(mean_jaccard = mean(jaccard, na.rm = TRUE),
+            .groups = "drop") %>%
+  rename(r = ratio)
+
 # Création du graphique
-ggplot(combined_delta_0, aes(x = factor(ratio), y = jaccard ,fill = factor(algo))) +
-  geom_boxplot(color = "black", outliers = FALSE,show.legend = TRUE) +
-  facet_grid(name_segment~ID) +
+ggplot(df_mean, aes(
+  x = factor(segment_mean),
+  y = mean_jaccard,
+  color = factor(algo),  # couleur par algo
+  linetype = ID, # style de ligne par ID (Normal/Gamma)
+  group = interaction(algo, ID) # connecter points par algo et ID
+  
+)) +
+  geom_line(size = 0.8) +
+  geom_point(size = 2) + 
+  facet_grid(K ~ r, labeller = label_both) +
+  # facet_grid(K ~ r, scales = "free", labeller = label_both) +
+  # geom_hline(aes(yintercept = 0), linetype = "dashed", color = "black", linewidth = 0.8) +
   theme_bw() +
-  labs(y = "Jaccard Index", x = expression(italic(r)~ "ratio"), title = NULL) +
+  labs(
+    x = "Mean segment length (S)",
+    y = "Jaccard Index",
+    color = "Method",
+    linetype = "Distribution"
+  ) +
+  scale_color_brewer(palette = "Dark2") +
+  # scale_y_continuous(trans = "log10", breaks = c(2,5,10,15,30))+
+  # scale_y_log10() +
   theme(
-    # axis.ticks.x = element_blank(),
-    axis.title.y = element_text(size = 24, margin = margin(r = 10)),  
-    axis.title.x = element_text(size = 24, margin = margin(t = 10)),
-    axis.text.y = element_text(size = 16),
-    axis.text.x = element_text(size = 16),
-    legend.text = element_text(size = 18),  
-    legend.title = element_text(size = 20),
-    strip.text = element_text(size = 16)
-  )+ 
-  scale_fill_brewer(n="Algorithms",palette = "Dark2")
+    legend.position = "bottom",
+    panel.grid.minor = element_blank(),
+    axis.title = element_text(size = 16),
+    axis.text = element_text(size = 14),
+    strip.text = element_text(size = 14)
+  ) 
 
 
 ##### Ensambling (pour Figure 7) #####
@@ -1165,8 +1244,12 @@ ensambling_log_VB <- consensus_change_points[new_sequence]
 print(ensambling_log_VB)
 
 
+
+
+
 ##### Figure 7 #####
 
+# Data <- data
 
 label <- c("Beast", "BinSeg", "CPM","CumSeg", "Hubert", "PELT", "SegNeigh", "", "Consensus")
 
@@ -1234,40 +1317,40 @@ ticks_positions <- approx(x = Data$measure/1000, y = 1:N, xout = ticks_labels)$y
 
 
 Data$ID_AC <- "Active Channel Width (m)"
-Data$ID_log_AC <- "Log transform"
+Data$ID_log_AC <- "Log transform\n(active channel width)"
 Data$ID_VB <- "Valley Bottom Width (m)"
-Data$ID_log_VB <- "Log transform"
+Data$ID_log_VB <- "Log transform\n(valley bottom width)"
 
 
-ac1 <- ggplot(Data, aes(x = 1:N, y = active_channel_width))+
-  geom_line(size = 0.8)+
-  facet_wrap(~ ID_AC, ncol = 1, strip.position = "left", switch = "y")+
-  theme_minimal()+
-  theme_minimal() +
-  theme(
-    panel.border = element_blank(), # Supprime les bordures
-    panel.grid = element_blank(),   # Supprime les grilles
-    axis.line.y = element_line(color = "black", size = 0.6), # Ajoute une ligne verticale comme axe Y
-    axis.ticks.y = element_line(color = "black"), # Ajoute des ticks sur l'axe Y
-    axis.text.y = element_text(size = 16),  # Affiche les étiquettes sur l'axe Y
-    axis.title.y = element_text(size = 16), # Ajoute un titre à l'axe Y
-    strip.text.y.left = element_text(
-      hjust = 0.5, 
-      vjust = 0.5, 
-      size = 16,
-      margin = margin(r = 5, l = 15)
-    ),
-    strip.placement = "outside",  # Place les labels des facettes à l'extérieur
-    axis.text.x = element_blank(), # Supprime les étiquettes (textes) sur l'axe X
-    axis.ticks.x = element_blank(), # Supprime les ticks de l'axe X
-    axis.title.x = element_blank(), # Supprime le titre de l'axe X
-  ) +
-  scale_x_continuous(
-    breaks = ticks_positions,  # Positions interpolées des ticks
-    labels = ticks_labels,  # Étiquettes correspondant aux distances
-    expand = c(0, 0)  # Assure que l'axe commence à x = 0
-  ) +
-  labs(x = NULL, y = NULL)
+# ac1 <- ggplot(Data, aes(x = 1:N, y = active_channel_width))+
+#   geom_line(size = 0.8)+
+#   facet_wrap(~ ID_AC, ncol = 1, strip.position = "left", switch = "y")+
+#   theme_minimal()+
+#   theme_minimal() +
+#   theme(
+#     panel.border = element_blank(), # Supprime les bordures
+#     panel.grid = element_blank(),   # Supprime les grilles
+#     axis.line.y = element_line(color = "black", size = 0.6), # Ajoute une ligne verticale comme axe Y
+#     axis.ticks.y = element_line(color = "black"), # Ajoute des ticks sur l'axe Y
+#     axis.text.y = element_text(size = 16),  # Affiche les étiquettes sur l'axe Y
+#     axis.title.y = element_text(size = 16), # Ajoute un titre à l'axe Y
+#     strip.text.y.left = element_text(
+#       hjust = 0.5, 
+#       vjust = 0.5, 
+#       size = 16,
+#       margin = margin(r = 5, l = 15)
+#     ),
+#     strip.placement = "outside",  # Place les labels des facettes à l'extérieur
+#     axis.text.x = element_blank(), # Supprime les étiquettes (textes) sur l'axe X
+#     axis.ticks.x = element_blank(), # Supprime les ticks de l'axe X
+#     axis.title.x = element_blank(), # Supprime le titre de l'axe X
+#   ) +
+#   scale_x_continuous(
+#     breaks = ticks_positions,  # Positions interpolées des ticks
+#     labels = ticks_labels,  # Étiquettes correspondant aux distances
+#     expand = c(0, 0)  # Assure que l'axe commence à x = 0
+#   ) +
+#   labs(x = NULL, y = NULL)
 
 ac1_log <- ggplot(Data, aes(x = 1:N, y = log(active_channel_width)+1))+
   geom_line(size = 0.8)+
@@ -1300,37 +1383,37 @@ ac1_log <- ggplot(Data, aes(x = 1:N, y = log(active_channel_width)+1))+
 
 
 
-ac2 <- ggplot() +
-  geom_line(data = data_comb, aes(x = x, y = y), color = "black", size = 0.8) +
-  geom_segment(data = encoches_combined_AC, aes(x = x, xend = x, y = y - 0.6, yend = y + 0.6), color = "red", size = 1.5) +
-  facet_wrap(~factor(ID, levels = label), ncol = 1, strip.position = "left")  +
-  theme_void() +
-  theme(
-    panel.border = element_blank(),
-    axis.title.x = element_text(size = 18, color = "black", margin = margin(t = 10)),
-    axis.text.Y = element_blank(),
-    axis.text.x = element_text(size = 16, color = "black"),  # Ajouter le texte pour l'axe x
-    axis.ticks.y = element_blank(),
-    strip.text.y.left = element_text(
-      angle = 0, 
-      hjust = 0,    # Alignement horizontal vers la gauche
-      vjust = 0.5,  # Alignement vertical centré
-      size = 16,
-      margin = margin(r = 5, l = 15)  # Décalage vers la gauche
-    ),
-    strip.placement = "outside",  # S'assurer que les labels des facettes sont à l'extérieur
-    strip.background = element_blank(),  # Supprimer le fond de la strip
-  ) +
-  ylim(0, 2) +
-  scale_x_continuous(
-    breaks = ticks_positions,  # Positions interpolées des ticks
-    labels = ticks_labels,  # Étiquettes correspondant aux distances
-    expand = c(0, 0)  # Assure que l'axe commence à x = 0
-  ) +
-  # Ajouter un carré blanc sur la facette "rien" pour cacher la ligne noire
-  geom_line(data = data.frame(ID = "", x = data_comb$x, y = data_comb$y),
-            aes(x = x, y = y), color = "white", size = 0.8) +
-  labs(x = "Distance from downstream (km)") 
+# ac2 <- ggplot() +
+#   geom_line(data = data_comb, aes(x = x, y = y), color = "black", size = 0.8) +
+#   geom_segment(data = encoches_combined_AC, aes(x = x, xend = x, y = y - 0.6, yend = y + 0.6), color = "red", size = 1.5) +
+#   facet_wrap(~factor(ID, levels = label), ncol = 1, strip.position = "left")  +
+#   theme_void() +
+#   theme(
+#     panel.border = element_blank(),
+#     axis.title.x = element_text(size = 18, color = "black", margin = margin(t = 10)),
+#     axis.text.Y = element_blank(),
+#     axis.text.x = element_text(size = 16, color = "black"),  # Ajouter le texte pour l'axe x
+#     axis.ticks.y = element_blank(),
+#     strip.text.y.left = element_text(
+#       angle = 0, 
+#       hjust = 0,    # Alignement horizontal vers la gauche
+#       vjust = 0.5,  # Alignement vertical centré
+#       size = 16,
+#       margin = margin(r = 5, l = 15)  # Décalage vers la gauche
+#     ),
+#     strip.placement = "outside",  # S'assurer que les labels des facettes sont à l'extérieur
+#     strip.background = element_blank(),  # Supprimer le fond de la strip
+#   ) +
+#   ylim(0, 2) +
+#   scale_x_continuous(
+#     breaks = ticks_positions,  # Positions interpolées des ticks
+#     labels = ticks_labels,  # Étiquettes correspondant aux distances
+#     expand = c(0, 0)  # Assure que l'axe commence à x = 0
+#   ) +
+#   # Ajouter un carré blanc sur la facette "rien" pour cacher la ligne noire
+#   geom_line(data = data.frame(ID = "", x = data_comb$x, y = data_comb$y),
+#             aes(x = x, y = y), color = "white", size = 0.8) +
+#   labs(x = "Distance from downstream (km)") 
 
 
 
@@ -1369,36 +1452,36 @@ ac2_log <- ggplot() +
 
 
 
-# idem pour VB
-vb1 <- ggplot(Data, aes(x = 1:N, y = valley_bottom_width))+
-  geom_line(size = 0.8)+
-  facet_wrap(~ ID_VB, ncol = 1, strip.position = "left", switch = "y")+
-  theme_minimal()+
-  theme_minimal() +
-  theme(
-    panel.border = element_blank(), # Supprime les bordures
-    panel.grid = element_blank(),   # Supprime les grilles
-    axis.line.y = element_line(color = "black", size = 0.6), # Ajoute une ligne verticale comme axe Y
-    axis.ticks.y = element_line(color = "black"), # Ajoute des ticks sur l'axe Y
-    axis.text.y = element_text(size = 16),  # Affiche les étiquettes sur l'axe Y
-    axis.title.y = element_text(size = 16), # Ajoute un titre à l'axe Y
-    strip.text.y.left = element_text(
-      hjust = 0.5, 
-      vjust = 0.5, 
-      size = 16,
-      margin = margin(r = 5, l = 15)
-    ),
-    strip.placement = "outside",  # Place les labels des facettes à l'extérieur
-    axis.text.x = element_blank(), # Supprime les étiquettes (textes) sur l'axe X
-    axis.ticks.x = element_blank(), # Supprime les ticks de l'axe X
-    axis.title.x = element_blank(), # Supprime le titre de l'axe X
-  ) +
-  scale_x_continuous(
-    breaks = ticks_positions,  # Positions interpolées des ticks
-    labels = ticks_labels,  # Étiquettes correspondant aux distances
-    expand = c(0, 0)  # Assure que l'axe commence à x = 0
-  ) +
-  labs(x = NULL, y = NULL)
+# # idem pour VB
+# vb1 <- ggplot(Data, aes(x = 1:N, y = valley_bottom_width))+
+#   geom_line(size = 0.8)+
+#   facet_wrap(~ ID_VB, ncol = 1, strip.position = "left", switch = "y")+
+#   theme_minimal()+
+#   theme_minimal() +
+#   theme(
+#     panel.border = element_blank(), # Supprime les bordures
+#     panel.grid = element_blank(),   # Supprime les grilles
+#     axis.line.y = element_line(color = "black", size = 0.6), # Ajoute une ligne verticale comme axe Y
+#     axis.ticks.y = element_line(color = "black"), # Ajoute des ticks sur l'axe Y
+#     axis.text.y = element_text(size = 16),  # Affiche les étiquettes sur l'axe Y
+#     axis.title.y = element_text(size = 16), # Ajoute un titre à l'axe Y
+#     strip.text.y.left = element_text(
+#       hjust = 0.5, 
+#       vjust = 0.5, 
+#       size = 16,
+#       margin = margin(r = 5, l = 15)
+#     ),
+#     strip.placement = "outside",  # Place les labels des facettes à l'extérieur
+#     axis.text.x = element_blank(), # Supprime les étiquettes (textes) sur l'axe X
+#     axis.ticks.x = element_blank(), # Supprime les ticks de l'axe X
+#     axis.title.x = element_blank(), # Supprime le titre de l'axe X
+#   ) +
+#   scale_x_continuous(
+#     breaks = ticks_positions,  # Positions interpolées des ticks
+#     labels = ticks_labels,  # Étiquettes correspondant aux distances
+#     expand = c(0, 0)  # Assure que l'axe commence à x = 0
+#   ) +
+#   labs(x = NULL, y = NULL)
 
 vb1_log <- ggplot(Data, aes(x = 1:N, y = log(valley_bottom_width)+1))+
   geom_line(size = 0.8)+
@@ -1431,37 +1514,37 @@ vb1_log <- ggplot(Data, aes(x = 1:N, y = log(valley_bottom_width)+1))+
 
 
 
-vb2 <- ggplot() +
-  geom_line(data = data_comb, aes(x = x, y = y), color = "black", size = 0.8) +
-  geom_segment(data = encoches_combined_VB, aes(x = x, xend = x, y = y - 0.6, yend = y + 0.6), color = "red", size = 1.5) +
-  facet_wrap(~factor(ID, levels = label), ncol = 1, strip.position = "left")  +
-  theme_void() +
-  theme(
-    panel.border = element_blank(),
-    axis.title.x = element_text(size = 18, color = "black", margin = margin(t = 10)),
-    axis.text.Y = element_blank(),
-    axis.text.x = element_text(size = 16, color = "black"),  # Ajouter le texte pour l'axe x
-    axis.ticks.y = element_blank(),
-    strip.text.y.left = element_text(
-      angle = 0, 
-      hjust = 0,    # Alignement horizontal vers la gauche
-      vjust = 0.5,  # Alignement vertical centré
-      size = 16,
-      margin = margin(r = 5, l = 15)  # Décalage vers la gauche
-    ),
-    strip.placement = "outside",  # S'assurer que les labels des facettes sont à l'extérieur
-    strip.background = element_blank(),  # Supprimer le fond de la strip
-  ) +
-  ylim(0, 2) +
-  scale_x_continuous(
-    breaks = ticks_positions,  # Positions interpolées des ticks
-    labels = ticks_labels,  # Étiquettes correspondant aux distances
-    expand = c(0, 0)  # Assure que l'axe commence à x = 0
-  ) +
-  # Ajouter un carré blanc sur la facette "rien" pour cacher la ligne noire
-  geom_line(data = data.frame(ID = "", x = data_comb$x, y = data_comb$y),
-            aes(x = x, y = y), color = "white", size = 0.8) +
-  labs(x = "Distance from downstream (km)") 
+# vb2 <- ggplot() +
+#   geom_line(data = data_comb, aes(x = x, y = y), color = "black", size = 0.8) +
+#   geom_segment(data = encoches_combined_VB, aes(x = x, xend = x, y = y - 0.6, yend = y + 0.6), color = "red", size = 1.5) +
+#   facet_wrap(~factor(ID, levels = label), ncol = 1, strip.position = "left")  +
+#   theme_void() +
+#   theme(
+#     panel.border = element_blank(),
+#     axis.title.x = element_text(size = 18, color = "black", margin = margin(t = 10)),
+#     axis.text.Y = element_blank(),
+#     axis.text.x = element_text(size = 16, color = "black"),  # Ajouter le texte pour l'axe x
+#     axis.ticks.y = element_blank(),
+#     strip.text.y.left = element_text(
+#       angle = 0, 
+#       hjust = 0,    # Alignement horizontal vers la gauche
+#       vjust = 0.5,  # Alignement vertical centré
+#       size = 16,
+#       margin = margin(r = 5, l = 15)  # Décalage vers la gauche
+#     ),
+#     strip.placement = "outside",  # S'assurer que les labels des facettes sont à l'extérieur
+#     strip.background = element_blank(),  # Supprimer le fond de la strip
+#   ) +
+#   ylim(0, 2) +
+#   scale_x_continuous(
+#     breaks = ticks_positions,  # Positions interpolées des ticks
+#     labels = ticks_labels,  # Étiquettes correspondant aux distances
+#     expand = c(0, 0)  # Assure que l'axe commence à x = 0
+#   ) +
+#   # Ajouter un carré blanc sur la facette "rien" pour cacher la ligne noire
+#   geom_line(data = data.frame(ID = "", x = data_comb$x, y = data_comb$y),
+#             aes(x = x, y = y), color = "white", size = 0.8) +
+#   labs(x = "Distance from downstream (km)") 
 
 
 
@@ -1499,21 +1582,23 @@ vb2_log <- ggplot() +
 
 
 
-k1 <- ac1 / ac2 
-k1
+# k1 <- ac1 / ac2 
+# k1
 k2 <- ac1_log / ac2_log
 k2
 
 plot_grid(k1, k2, ncol = 1, labels = c("a", "b"), label_size = 25)
 
 
-v1 <- vb1 / vb2
-v1
+# v1 <- vb1 / vb2
+# v1
 v2 <- vb1_log / vb2_log
 v2
 
-plot_grid(v1, v2, ncol = 1, labels = c("a", "b"), label_size = 25)
+# plot_grid(v1, v2, ncol = 1, labels = c("a", "b"), label_size = 25)
 
+
+plot_grid(k2, v2, ncol = 1, labels = c("a", "b"), label_size = 25)
 
 
 

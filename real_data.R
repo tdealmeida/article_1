@@ -25,32 +25,37 @@ library(patchwork)
 # ============================================
 # 2. Chargement et Préparation des Données
 # ============================================
+Data <- data %>%
+  mutate(length = as.numeric(st_length(geom))) %>%  # conversion en numeric
+  filter(!(is.na(measure_medial_axis) & length < 180))
 
-# Importation des données du Drac
-Data <- read.csv("data_fct.csv")
+pourcentage_df <- Data %>% # Sélection des axes avec données (+80% de données valides)
+  mutate(is_na_or_zero = is.na(active_channel_width) | active_channel_width == 0) %>%
+  group_by(toponyme) %>%
+  summarise(pourcentage_na_ou_zero = mean(is_na_or_zero, na.rm = TRUE) * 100)
 
-# Tri des données selon la colonne 'measure' (assumant que 'measure' est une colonne pertinente)
-Data <- arrange(Data, measure)
+toponymes_valides <- pourcentage_df %>% # Filtrage des toponymes avec moins de 80% de NA ou de zéros
+  filter(pourcentage_na_ou_zero < 80) %>%
+  pull(toponyme)
 
-# Nettoyage des données :
-# Suppression des lignes au début et à la fin contenant des NA
-while (anyNA(Data[1, ])) {
-  Data <- Data[-1, ]
-}
-while (anyNA(Data[nrow(Data), ])) {
-  Data <- Data[-nrow(Data), ]
-}
+Data <- Data %>%
+  filter(toponyme %in% toponymes_valides)
 
-# Suppression des lignes qui n'ont pas au moins deux éléments valides pour l'interpolation
-Data <- Data[rowSums(!is.na(Data)) >= 2, ]
+Data <- Data %>% # Tri des données selon la colonne 'measure' (assumant que 'measure' est une colonne pertinente)
+  group_by(toponyme) %>%
+  arrange(measure, .by_group = TRUE) %>%
+  mutate(across(where(is.numeric), ~ na.approx(.x, na.rm = FALSE))) %>%
+  filter(if_all(where(is.numeric), ~ !is.na(.x))) %>%
+  ungroup()
 
-# Interpolation des valeurs manquantes pour les colonnes numériques
-Data <- Data %>% mutate_if(is.numeric, na.approx)
+sum(is.na(Data$measure_medial_axis)) # Vérification qu'il n'y a plus de NA dans active_channel_width
 
-# Sélection des variables d'intérêt
-data <- Data %>% select("active_channel_width", "valley_bottom_width")
+data <- Data %>%
+  select(-fid)
 
-# Application de la transformation logarithmique
+data <- data %>%
+  filter(toponyme == "le Drac")
+
 data$log_AC <- log(data$active_channel_width + 1)
 data$log_VB <- log(data$valley_bottom_width + 1)
 

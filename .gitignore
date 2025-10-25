@@ -3,3 +3,8 @@
 .RData
 .Ruserdata
 Data
+Data_v2.R
+results_AC/
+results_log_AC/
+results_VB/
+results_log_VB/
